@@ -74,6 +74,7 @@ class Module(module.ModuleModel):
         try:
             self.context.rpc_manager.call.auth_get_group(1)
         except:
+            log.info('adding root group')
             self.context.rpc_manager.call.auth_add_group("Root", None, 1)
             for root_permission in self.descriptor.config.get(
                 "initial_root_permissions", list()
