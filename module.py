@@ -97,8 +97,12 @@ class Module(module.ModuleModel):
         #
         user_id = auth_ctx["user_id"]
         # Ensure global_admin is set
-        log.info(f"create user")
-        self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
+        try:
+            log.info(f"create user")
+            self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
+            self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin', 'default')
+        except:
+            log.info(f"User already exists")
         global_admin_permission = "global_admin"
         initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
         if user_provider_id in initial_global_admins:
