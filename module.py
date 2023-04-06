@@ -85,7 +85,7 @@ class Module(module.ModuleModel):
         user_provider_id = auth_ctx["provider_attr"]["nameid"]
         # Ensure user is present
         if auth_ctx["user_id"] is None:
-            user_email = f"{user_provider_id}@localhost"
+            user_email = auth_ctx["provider_attr"].get("attributes", {}).get("email") or f"{user_provider_id}@localhost"
             user_name = user_provider_id
             user_id = self.context.rpc_manager.call.auth_add_user(user_email, user_name)
             #
@@ -97,6 +97,12 @@ class Module(module.ModuleModel):
         #
         user_id = auth_ctx["user_id"]
         # Ensure global_admin is set
+        try:
+            log.info(f"create user")
+            self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
+            self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin', 'default')
+        except:
+            log.info(f"User already exists")
         global_admin_permission = "global_admin"
         initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
         if user_provider_id in initial_global_admins:
