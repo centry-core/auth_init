@@ -99,8 +99,8 @@ class Module(module.ModuleModel):
         # Ensure global_admin is set
         try:
             log.info(f"create user")
-            self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
-            self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin', 'default')
+            if user_id == 1:
+                self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
         except:
             log.info(f"User already exists")
         global_admin_permission = "global_admin"
