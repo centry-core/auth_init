@@ -16,6 +16,7 @@
 #   limitations under the License.
 
 """ Module """
+from datetime import datetime
 
 from pylon.core.tools import log  # pylint: disable=E0611,E0401
 from pylon.core.tools import module  # pylint: disable=E0611,E0401
@@ -104,6 +105,10 @@ class Module(module.ModuleModel):
                 self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
         except:
             log.info(f"User already exists")
+        _, returning_name = self.context.rpc_manager.call.auth_update_user(
+            id_=user_id, last_login=datetime.now())
+        if not returning_name:
+            self.context.rpc_manager.call.auth_update_user(id_=user_id, name=user_provider_id)
         global_admin_permission = "global_admin"
         initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
         if user_provider_id in initial_global_admins:
