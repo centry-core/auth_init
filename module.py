@@ -76,7 +76,7 @@ class Module(module.ModuleModel):
         except:
             self.context.rpc_manager.call.auth_add_group("Root", None, 1)
             for root_permission in self.descriptor.config.get(
-                "initial_root_permissions", list()
+                    "initial_root_permissions", list()
             ):
                 self.context.rpc_manager.call.auth_add_group_permission(
                     1, 1, root_permission
@@ -85,7 +85,8 @@ class Module(module.ModuleModel):
         user_provider_id = auth_ctx["provider_attr"]["nameid"]
         # Ensure user is present
         if auth_ctx["user_id"] is None:
-            user_email = f"{user_provider_id}@localhost"
+            user_email = auth_ctx["provider_attr"].get("attributes", {}).get("email") or \
+                         f"{user_provider_id}@centry.user"
             user_name = user_provider_id
             user_id = self.context.rpc_manager.call.auth_add_user(user_email, user_name)
             #
@@ -97,12 +98,46 @@ class Module(module.ModuleModel):
         #
         user_id = auth_ctx["user_id"]
         # Ensure global_admin is set
+        try:
+            log.info(f"create user")
+            if user_id == 1:
+                self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
+        except:
+            log.info(f"User already exists")
         global_admin_permission = "global_admin"
         initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
         if user_provider_id in initial_global_admins:
-            global_user_permissions = self.context.rpc_manager.call.auth_get_user_permissions(user_id, 1)
+            global_user_permissions = self.context.rpc_manager.call.auth_get_user_permissions(
+                user_id, 1)
             if global_admin_permission not in global_user_permissions:
-                self.context.rpc_manager.call.auth_add_user_permission(user_id, 1, global_admin_permission)
+                self.context.rpc_manager.call.auth_add_user_permission(user_id, 1,
+                                                                       global_admin_permission)
                 log.info("Added permission for %s: %s", user_id, global_admin_permission)
-        #
+
+
+                # Auth: add project token
+                all_tokens = self.context.rpc_manager.call.auth_list_tokens(user_id)
+                #
+                if len(all_tokens) < 1:
+                    token_id = self.context.rpc_manager.call.auth_add_token(
+                        user_id, "api",
+                        # expires=datetime.datetime.now()+datetime.timedelta(seconds=30),
+                    )
+                else:
+                    token_id = all_tokens[0]["id"]
+                #
+                # current_permissions = self.context.rpc_manager.call.auth_resolve_permissions()
+                current_permissions = {
+                    item['permission'] for item in
+                    self.context.rpc_manager.call.auth_get_user_roles(user_id)
+                }
+                #
+                for permission in current_permissions:
+                    try:
+                        self.context.rpc_manager.call.auth_add_token_permission(token_id, 1, permission)
+                    except:  # pylint: disable=W0702
+                        pass
+                #
+                token = self.context.rpc_manager.call.auth_encode_token(token_id)
+                self.context.rpc_manager.call.secrets_add_token(token)
         return auth_ctx
