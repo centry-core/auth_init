@@ -99,26 +99,28 @@ class Module(module.ModuleModel):
         #
         user_id = auth_ctx["user_id"]
         # Ensure global_admin is set
-        try:
-            log.info(f"create user")
-            if user_id == 1:
-                self.context.rpc_manager.call.auth_assign_user_to_role(user_id, 'admin')
-        except:
-            log.info(f"User already exists")
+
         _, returning_name = self.context.rpc_manager.call.auth_update_user(
             id_=user_id, last_login=datetime.now())
         if not returning_name:
             self.context.rpc_manager.call.auth_update_user(id_=user_id, name=user_provider_id)
-        global_admin_permission = "global_admin"
-        initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
-        if user_provider_id in initial_global_admins:
-            global_user_permissions = self.context.rpc_manager.call.auth_get_user_permissions(
-                user_id, 1)
-            if global_admin_permission not in global_user_permissions:
-                self.context.rpc_manager.call.auth_add_user_permission(user_id, 1,
-                                                                       global_admin_permission)
-                log.info("Added permission for %s: %s", user_id, global_admin_permission)
 
+        global_admin_role = "admin"
+
+        initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
+
+        if user_provider_id in initial_global_admins:
+            global_user_roles = self.context.rpc_manager.call.auth_get_user_roles(
+                user_id
+            )
+            log.info("User roles: %s", global_user_roles)
+            if global_admin_role not in global_user_roles:
+
+                self.context.rpc_manager.call.auth_assign_user_to_role(
+                    user_id,
+                    global_admin_role
+                )
+                log.info("Added role for %s: %s", user_id, global_admin_role)
 
                 # Auth: add project token
                 all_tokens = self.context.rpc_manager.call.auth_list_tokens(user_id)
@@ -130,18 +132,8 @@ class Module(module.ModuleModel):
                     )
                 else:
                     token_id = all_tokens[0]["id"]
+                self.context.rpc_manager.call.auth_assign_role_to_token(token_id, 'admin')
                 #
-                # current_permissions = self.context.rpc_manager.call.auth_resolve_permissions()
-                current_permissions = {
-                    item['permission'] for item in
-                    self.context.rpc_manager.call.auth_get_user_roles(user_id)
-                }
-                #
-                for permission in current_permissions:
-                    try:
-                        self.context.rpc_manager.call.auth_add_token_permission(token_id, 1, permission)
-                    except:  # pylint: disable=W0702
-                        pass
                 #
                 token = self.context.rpc_manager.call.auth_encode_token(token_id)
                 self.context.rpc_manager.call.secrets_add_token(token)
