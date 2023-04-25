@@ -132,7 +132,6 @@ class Module(module.ModuleModel):
                     )
                 else:
                     token_id = all_tokens[0]["id"]
-                self.context.rpc_manager.call.auth_assign_role_to_token(token_id, 'admin')
                 #
                 #
                 token = self.context.rpc_manager.call.auth_encode_token(token_id)
