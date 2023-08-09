@@ -95,6 +95,8 @@ class Module(module.ModuleModel):
             self.context.rpc_manager.call.auth_add_user_group(user_id, 1)
             #
             auth_ctx["user_id"] = user_id
+            if "/AITrial" in auth_ctx["provider_attr"].get("attributes", {}).get("groups", []):
+                self.context.event_manager.fire_event("new_ai_user", user_id)
             log.info("Created user: %s", user_id)
         #
         user_id = auth_ctx["user_id"]
