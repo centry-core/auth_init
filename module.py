@@ -96,7 +96,7 @@ class Module(module.ModuleModel):
             #
             auth_ctx["user_id"] = user_id
             if "/AITrial" in auth_ctx["provider_attr"].get("attributes", {}).get("groups", []):
-                self.context.event_manager.fire_event("new_ai_user", user_id)
+                self.context.event_manager.fire_event("new_ai_user", {"user_id": user_id, "user_email": user_email})
             log.info("Created user: %s", user_id)
         #
         user_id = auth_ctx["user_id"]
