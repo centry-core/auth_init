@@ -86,17 +86,21 @@ class Module(module.ModuleModel):
         user_provider_id = auth_ctx["provider_attr"]["nameid"]
         # Ensure user is present
         if auth_ctx["user_id"] is None:
-            user_email = auth_ctx["provider_attr"].get("attributes", {}).get("email") or \
+            attributes = auth_ctx["provider_attr"].get("attributes", {})
+            user_email = attributes.get("email") or \
                          f"{user_provider_id}@centry.user"
-            user_name = user_provider_id
+            user_email = user_email.lower()
+            user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"\
+                if attributes.get('given_name', None) else user_email
             user_id = self.context.rpc_manager.call.auth_add_user(user_email, user_name)
             #
             self.context.rpc_manager.call.auth_add_user_provider(user_id, user_provider_id)
             self.context.rpc_manager.call.auth_add_user_group(user_id, 1)
             #
             auth_ctx["user_id"] = user_id
-            if "/AITrial" in auth_ctx["provider_attr"].get("attributes", {}).get("groups", []):
-                self.context.event_manager.fire_event("new_ai_user", {"user_id": user_id, "user_email": user_email})
+            self.context.event_manager.fire_event("new_ai_user", {"user_id": user_id, "user_email": user_email})
+            #if "/AITrial" in auth_ctx["provider_attr"].get("attributes", {}).get("groups", []):
+
             log.info("Created user: %s", user_id)
         #
         user_id = auth_ctx["user_id"]
