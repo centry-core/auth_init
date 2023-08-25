@@ -91,7 +91,7 @@ class Module(module.ModuleModel):
                          f"{user_provider_id}@centry.user"
             user_email = user_email.lower()
             user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"\
-                if attributes.get('given_name', None) else user_email
+                if attributes.get('given_name', None) and attributes.get('family_name', None) else user_email
             user_id = self.context.rpc_manager.call.auth_add_user(user_email, user_name)
             #
             self.context.rpc_manager.call.auth_add_user_provider(user_id, user_provider_id)
