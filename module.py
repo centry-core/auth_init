@@ -96,7 +96,7 @@ class Module(module.ModuleModel):
             try:
                 user_id = self.context.rpc_manager.call.auth_get_user(
                     email=user_email,
-                )
+                )["id"]
                 #
                 self.context.rpc_manager.call.auth_add_user_provider(user_id, user_provider_id)
                 #
