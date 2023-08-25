@@ -102,7 +102,7 @@ class Module(module.ModuleModel):
                 #
                 auth_ctx["user_id"] = user_id
             except:  # pylint: disable=W0702
-                log.info("No users with same email, creating new one")
+                log.exception("No users with same email, creating new one")
             #
             if user_id is None:
                 user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"\
