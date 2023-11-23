@@ -85,12 +85,12 @@ class Module(module.ModuleModel):
         #
         user_provider_id = auth_ctx["provider_attr"]["nameid"]
         # Ensure user is present
+        attributes = auth_ctx["provider_attr"].get("attributes", {})
+        user_email = attributes.get("email") or \
+                     f"{user_provider_id}@centry.user"
+        user_email = user_email.lower()
+        #
         if auth_ctx["user_id"] is None:
-            attributes = auth_ctx["provider_attr"].get("attributes", {})
-            user_email = attributes.get("email") or \
-                         f"{user_provider_id}@centry.user"
-            user_email = user_email.lower()
-            #
             user_id = None
             #
             try:
@@ -113,12 +113,11 @@ class Module(module.ModuleModel):
                 self.context.rpc_manager.call.auth_add_user_group(user_id, 1)
                 #
                 auth_ctx["user_id"] = user_id
-                self.context.event_manager.fire_event("new_ai_user", {"user_id": user_id, "user_email": user_email})
-                #if "/AITrial" in auth_ctx["provider_attr"].get("attributes", {}).get("groups", []):
-
                 log.info("Created user: %s", user_id)
         #
         user_id = auth_ctx["user_id"]
+        self.context.event_manager.fire_event("new_ai_user", {"user_id": user_id, "user_email": user_email})
+        #
         # Ensure global_admin is set
 
         _, returning_name = self.context.rpc_manager.call.auth_update_user(
