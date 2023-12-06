@@ -135,25 +135,30 @@ class Module(module.ModuleModel):
             )
             log.info("User roles: %s", global_user_roles)
             if global_admin_role not in global_user_roles:
-
                 self.context.rpc_manager.call.auth_assign_user_to_role(
                     user_id,
                     global_admin_role
                 )
                 log.info("Added role for %s: %s", user_id, global_admin_role)
+            # Auth: add project token
+            #
+            all_tokens = self.context.rpc_manager.call.auth_list_tokens(user_id)
+            #
+            if len(all_tokens) < 1:
+                token_id = self.context.rpc_manager.call.auth_add_token(
+                    user_id, "api",
+                    # expires=datetime.datetime.now()+datetime.timedelta(seconds=30),
+                )
+            else:
+                token_id = all_tokens[0]["id"]
+            #
+            #
+            token = self.context.rpc_manager.call.auth_encode_token(token_id)
+            #
+            # TODO: check if token already present / valid
+            try:
+                self.context.rpc_manager.timeout(1).secrets_add_token(token)
+            except:  # pylint: disable=W0702
+                pass
 
-                # Auth: add project token
-                all_tokens = self.context.rpc_manager.call.auth_list_tokens(user_id)
-                #
-                if len(all_tokens) < 1:
-                    token_id = self.context.rpc_manager.call.auth_add_token(
-                        user_id, "api",
-                        # expires=datetime.datetime.now()+datetime.timedelta(seconds=30),
-                    )
-                else:
-                    token_id = all_tokens[0]["id"]
-                #
-                #
-                token = self.context.rpc_manager.call.auth_encode_token(token_id)
-                self.context.rpc_manager.call.secrets_add_token(token)
         return auth_ctx
