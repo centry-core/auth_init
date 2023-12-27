@@ -86,9 +86,13 @@ class Module(module.ModuleModel):
         user_provider_id = auth_ctx["provider_attr"]["nameid"]
         # Ensure user is present
         attributes = auth_ctx["provider_attr"].get("attributes", {})
-        user_email = attributes.get("email") or \
-                     f"{user_provider_id}@centry.user"
+        user_email = attributes.get("email") or f"{user_provider_id}@centry.user"
         user_email = user_email.lower()
+        if attributes.get('given_name') and attributes.get('family_name'):
+            user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"
+        else:
+            user_name = user_email
+
         #
         if auth_ctx["user_id"] is None:
             user_id = None
@@ -105,8 +109,6 @@ class Module(module.ModuleModel):
                 log.exception("No users with same email, creating new one")
             #
             if user_id is None:
-                user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"\
-                    if attributes.get('given_name', None) and attributes.get('family_name', None) else user_email
                 user_id = self.context.rpc_manager.call.auth_add_user(user_email, user_name)
                 #
                 self.context.rpc_manager.call.auth_add_user_provider(user_id, user_provider_id)
@@ -123,7 +125,7 @@ class Module(module.ModuleModel):
         _, returning_name = self.context.rpc_manager.call.auth_update_user(
             id_=user_id, last_login=datetime.now())
         if not returning_name:
-            self.context.rpc_manager.call.auth_update_user(id_=user_id, name=user_provider_id)
+            self.context.rpc_manager.call.auth_update_user(id_=user_id, name=user_name)
 
         global_admin_role = "admin"
 
