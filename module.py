@@ -21,7 +21,7 @@ from datetime import datetime
 from pylon.core.tools import log  # pylint: disable=E0611,E0401
 from pylon.core.tools import module  # pylint: disable=E0611,E0401
 
-from plugins.auth_core.tools import rpc_tools
+from plugins.auth_core.tools import rpc_tools  # pylint: disable=E0611,E0401
 
 
 class Module(module.ModuleModel):
@@ -49,6 +49,17 @@ class Module(module.ModuleModel):
         self.context.rpc_manager.call.auth_register_auth_processor(
             "auth_init_auth_processor"
         )
+        # Ensure root group present
+        try:
+            self.context.rpc_manager.call.auth_get_group(1)
+        except:  # pylint: disable=W0702
+            self.context.rpc_manager.call.auth_add_group("Root", None, 1)
+            for root_permission in self.descriptor.config.get(
+                    "initial_root_permissions", []
+            ):
+                self.context.rpc_manager.call.auth_add_group_permission(
+                    1, 1, root_permission
+                )
         # Ensure system user present
         system_user = "system@centry.user"
         global_admin_role = "admin"
@@ -71,7 +82,7 @@ class Module(module.ModuleModel):
                 global_admin_role,
             )
 
-    def deinit(self):  # pylint: disable=R0201
+    def deinit(self):
         """ De-init module """
         log.info("De-initializing module")
         # Unregister init auth processor
@@ -92,18 +103,6 @@ class Module(module.ModuleModel):
 
     @rpc_tools.wrap_exceptions(RuntimeError)
     def _init_auth_processor(self, auth_ctx):
-        # Ensure root group present
-        try:
-            self.context.rpc_manager.call.auth_get_group(1)
-        except:
-            self.context.rpc_manager.call.auth_add_group("Root", None, 1)
-            for root_permission in self.descriptor.config.get(
-                    "initial_root_permissions", list()
-            ):
-                self.context.rpc_manager.call.auth_add_group_permission(
-                    1, 1, root_permission
-                )
-        #
         user_provider_id = auth_ctx["provider_attr"]["nameid"]
         # Ensure user is present
         attributes = auth_ctx["provider_attr"].get("attributes", {})
@@ -138,7 +137,10 @@ class Module(module.ModuleModel):
                 log.info("Created user: %s", user_id)
         #
         user_id = auth_ctx["user_id"]
-        self.context.event_manager.fire_event("new_ai_user", {"user_id": user_id, "user_email": user_email})
+        self.context.event_manager.fire_event("new_ai_user", {
+            "user_id": user_id,
+            "user_email": user_email,
+        })
         #
         # Ensure global_admin is set
         #
@@ -148,8 +150,7 @@ class Module(module.ModuleModel):
             self.context.rpc_manager.call.auth_update_user(id_=user_id, name=user_name)
         #
         global_admin_role = "admin"
-        #
-        initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
+        initial_global_admins = self.descriptor.config.get("initial_global_admins", [])
         #
         if user_provider_id in initial_global_admins:
             global_user_roles = self.context.rpc_manager.call.auth_get_user_roles(
