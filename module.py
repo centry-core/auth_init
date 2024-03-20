@@ -49,6 +49,27 @@ class Module(module.ModuleModel):
         self.context.rpc_manager.call.auth_register_auth_processor(
             "auth_init_auth_processor"
         )
+        # Ensure system user present
+        system_user = "system@centry.user"
+        global_admin_role = "admin"
+        #
+        try:
+            system_user_id = self.context.rpc_manager.call.auth_get_user(
+                email=system_user,
+            )["id"]
+        except:  # pylint: disable=W0702
+            system_user_id = None
+        #
+        if system_user_id is None:
+            system_user_id = self.context.rpc_manager.call.auth_add_user(
+                system_user,
+                system_user,
+            )
+            self.context.rpc_manager.call.auth_add_user_group(system_user_id, 1)
+            self.context.rpc_manager.call.auth_assign_user_to_role(
+                system_user_id,
+                global_admin_role,
+            )
 
     def deinit(self):  # pylint: disable=R0201
         """ De-init module """
@@ -92,7 +113,6 @@ class Module(module.ModuleModel):
             user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"
         else:
             user_name = user_email
-
         #
         if auth_ctx["user_id"] is None:
             user_id = None
@@ -121,16 +141,16 @@ class Module(module.ModuleModel):
         self.context.event_manager.fire_event("new_ai_user", {"user_id": user_id, "user_email": user_email})
         #
         # Ensure global_admin is set
-
+        #
         _, returning_name = self.context.rpc_manager.call.auth_update_user(
             id_=user_id, last_login=datetime.now())
         if not returning_name:
             self.context.rpc_manager.call.auth_update_user(id_=user_id, name=user_name)
-
+        #
         global_admin_role = "admin"
-
+        #
         initial_global_admins = self.descriptor.config.get("initial_global_admins", list())
-
+        #
         if user_provider_id in initial_global_admins:
             global_user_roles = self.context.rpc_manager.call.auth_get_user_roles(
                 user_id
@@ -142,25 +162,5 @@ class Module(module.ModuleModel):
                     global_admin_role
                 )
                 log.info("Added role for %s: %s", user_id, global_admin_role)
-            # Auth: add project token
-            #
-            all_tokens = self.context.rpc_manager.call.auth_list_tokens(user_id)
-            #
-            if len(all_tokens) < 1:
-                token_id = self.context.rpc_manager.call.auth_add_token(
-                    user_id, "api",
-                    # expires=datetime.datetime.now()+datetime.timedelta(seconds=30),
-                )
-            else:
-                token_id = all_tokens[0]["id"]
-            #
-            #
-            token = self.context.rpc_manager.call.auth_encode_token(token_id)
-            #
-            # TODO: check if token already present / valid
-            try:
-                self.context.rpc_manager.timeout(1).secrets_add_token(token)
-            except:  # pylint: disable=W0702
-                pass
-
+        #
         return auth_ctx
