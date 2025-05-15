@@ -106,10 +106,14 @@ class Module(module.ModuleModel):
         user_provider_id = auth_ctx["provider_attr"]["nameid"]
         # Ensure user is present
         attributes = auth_ctx["provider_attr"].get("attributes", {})
+        #
         user_email = attributes.get("email") or f"{user_provider_id}@centry.user"
         user_email = user_email.lower()
-        if attributes.get('given_name') and attributes.get('family_name'):
+        #
+        if attributes.get("given_name") and attributes.get("family_name"):
             user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"
+        elif attributes.get("name"):
+            user_name = attributes.get("name")
         else:
             user_name = user_email
         #
