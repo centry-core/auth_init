@@ -16,12 +16,11 @@
 #   limitations under the License.
 
 """ Module """
-from datetime import datetime
 
 from pylon.core.tools import log  # pylint: disable=E0611,E0401
 from pylon.core.tools import module  # pylint: disable=E0611,E0401
 
-from plugins.auth_core.tools import rpc_tools  # pylint: disable=E0611,E0401
+from tools import auth_core  # pylint: disable=E0401
 
 
 class Module(module.ModuleModel):
@@ -30,10 +29,6 @@ class Module(module.ModuleModel):
     def __init__(self, context, descriptor):
         self.context = context
         self.descriptor = descriptor
-        # RPCs
-        self._rpcs = [
-            [self._init_auth_processor, "auth_init_auth_processor"],
-        ]
 
     #
     # Module
@@ -42,130 +37,37 @@ class Module(module.ModuleModel):
     def init(self):
         """ Init module """
         log.info("Initializing module")
-        # Init RPCs
-        for rpc_item in self._rpcs:
-            self.context.rpc_manager.register_function(*rpc_item)
+        # Init
+        self.descriptor.init_all()
         # Register init auth processor
-        self.context.rpc_manager.call.auth_register_auth_processor(
-            "auth_init_auth_processor"
-        )
+        auth_core.register_auth_processor("auth_init_auth_processor")
         # Ensure root group present
         try:
-            self.context.rpc_manager.call.auth_get_group(1)
+            auth_core.get_group(1)
         except:  # pylint: disable=W0702
-            self.context.rpc_manager.call.auth_add_group("Root", None, 1)
+            auth_core.add_group("Root", None, 1)
             for root_permission in self.descriptor.config.get(
                     "initial_root_permissions", []
             ):
-                self.context.rpc_manager.call.auth_add_group_permission(
-                    1, 1, root_permission
-                )
+                auth_core.add_group_permission(1, 1, root_permission)
         # Ensure system user present
         system_user = "system@centry.user"
         global_admin_role = "admin"
         #
         try:
-            system_user_id = self.context.rpc_manager.call.auth_get_user(
-                email=system_user,
-            )["id"]
+            system_user_id = auth_core.get_user(email=system_user)["id"]
         except:  # pylint: disable=W0702
             system_user_id = None
         #
         if system_user_id is None:
-            system_user_id = self.context.rpc_manager.call.auth_add_user(
-                system_user,
-                system_user,
-            )
-            self.context.rpc_manager.call.auth_add_user_group(system_user_id, 1)
-            self.context.rpc_manager.call.auth_assign_user_to_role(
-                system_user_id,
-                global_admin_role,
-            )
+            system_user_id = auth_core.add_user(system_user, system_user)
+            auth_core.add_user_group(system_user_id, 1)
+            auth_core.assign_user_to_role(system_user_id, global_admin_role)
 
     def deinit(self):
         """ De-init module """
         log.info("De-initializing module")
         # Unregister init auth processor
-        self.context.rpc_manager.call.auth_unregister_auth_processor(
-            "auth_init_auth_processor"
-        )
-        # De-init RPCs
-        for rpc_item in self._rpcs:
-            self.context.rpc_manager.unregister_function(*rpc_item)
-
-    #
-    # RPC
-    #
-
-    #
-    # RPC: Init auth processor
-    #
-
-    @rpc_tools.wrap_exceptions(RuntimeError)
-    def _init_auth_processor(self, auth_ctx):
-        user_provider_id = auth_ctx["provider_attr"]["nameid"]
-        # Ensure user is present
-        attributes = auth_ctx["provider_attr"].get("attributes", {})
-        #
-        user_email = attributes.get("email") or f"{user_provider_id}@centry.user"
-        user_email = user_email.lower()
-        #
-        if attributes.get("given_name") and attributes.get("family_name"):
-            user_name = f"{attributes.get('given_name')} {attributes.get('family_name')}"
-        elif attributes.get("name"):
-            user_name = attributes.get("name")
-        else:
-            user_name = user_email
-        #
-        if auth_ctx["user_id"] is None:
-            user_id = None
-            #
-            try:
-                user_id = self.context.rpc_manager.call.auth_get_user(
-                    email=user_email,
-                )["id"]
-                #
-                self.context.rpc_manager.call.auth_add_user_provider(user_id, user_provider_id)
-                #
-                auth_ctx["user_id"] = user_id
-            except:  # pylint: disable=W0702
-                log.exception("No users with same email, creating new one")
-            #
-            if user_id is None:
-                user_id = self.context.rpc_manager.call.auth_add_user(user_email, user_name)
-                #
-                self.context.rpc_manager.call.auth_add_user_provider(user_id, user_provider_id)
-                self.context.rpc_manager.call.auth_add_user_group(user_id, 1)
-                #
-                auth_ctx["user_id"] = user_id
-                log.info("Created user: %s", user_id)
-        #
-        user_id = auth_ctx["user_id"]
-        self.context.event_manager.fire_event("new_ai_user", {
-            "user_id": user_id,
-            "user_email": user_email,
-        })
-        #
-        # Ensure global_admin is set
-        #
-        _, returning_name = self.context.rpc_manager.call.auth_update_user(
-            id_=user_id, last_login=datetime.now())
-        if not returning_name:
-            self.context.rpc_manager.call.auth_update_user(id_=user_id, name=user_name)
-        #
-        global_admin_role = "admin"
-        initial_global_admins = self.descriptor.config.get("initial_global_admins", [])
-        #
-        if user_provider_id in initial_global_admins:
-            global_user_roles = self.context.rpc_manager.call.auth_get_user_roles(
-                user_id
-            )
-            log.info("User roles: %s", global_user_roles)
-            if global_admin_role not in global_user_roles:
-                self.context.rpc_manager.call.auth_assign_user_to_role(
-                    user_id,
-                    global_admin_role
-                )
-                log.info("Added role for %s: %s", user_id, global_admin_role)
-        #
-        return auth_ctx
+        auth_core.unregister_auth_processor("auth_init_auth_processor")
+        # De-init
+        self.descriptor.deinit_all()
