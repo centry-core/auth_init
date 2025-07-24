@@ -38,7 +38,9 @@ class Module(module.ModuleModel):
         """ Init module """
         log.info("Initializing module")
         # Init
-        self.descriptor.init_all()
+        self.descriptor.init_all(
+            url_prefix=auth_core.get_relative_url_prefix(self.descriptor),
+        )
         # Register init auth processor
         auth_core.register_auth_processor("auth_init_auth_processor")
         # Ensure root group present
